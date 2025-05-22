@@ -1,6 +1,6 @@
 import authService from './auth.service';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:1929';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://a2aa733d4f568af200723c9515cef335.serveo.net';
 
 class ApiService {
   async get<T>(endpoint: string, requireAuth = true): Promise<T> {

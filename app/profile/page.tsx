@@ -10,7 +10,7 @@ import { useTelegramUser, useTelegramBackButton } from "@/hooks/use-telegram"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, isLoading } = useTelegramUser()
+  const { user, isLoading, tokens, logout } = useTelegramUser()
   useTelegramBackButton(true)
 
   const [subscriptionData, setSubscriptionData] = useState({
@@ -23,17 +23,55 @@ export default function ProfilePage() {
     countries: 65,
   })
 
-  // In a real app, you would fetch this data from your API
+  const [authStatus, setAuthStatus] = useState({
+    isAuthenticated: false,
+    provider: ""
+  })
+
+  // Проверяем статус авторизации и получаем данные подписки
   useEffect(() => {
-    if (user) {
-      // Example of how you might fetch subscription data based on the user
-      // This would be replaced with an actual API call
+    if (user && tokens) {
+      console.log("Пользователь Telegram авторизован!")
+      setAuthStatus({
+        isAuthenticated: true,
+        provider: "telegram"
+      })
+
+      // Пример того, как вы можете получить данные подписки на основе пользователя
+      // Это будет заменено на реальный API-вызов
       const fetchSubscriptionData = async () => {
         try {
-          // Simulate API call
-          await new Promise((resolve) => setTimeout(resolve, 500))
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-          // Mock data - in a real app, this would come from your backend
+          // Реальный API-запрос с использованием токена доступа
+          const response = await fetch(`${apiUrl}/subscription/info`, {
+            headers: {
+              'Authorization': `Bearer ${tokens.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          })
+
+          if (!response.ok) {
+            // Если запрос не удался, используем тестовые данные
+            console.log("Используем тестовые данные подписки")
+            setSubscriptionData({
+              plan: "FreeBirdVPN",
+              status: "offline",
+              dataUsage: "153 Мб",
+              expiryDate: "3 мая 2025",
+              isExpired: true,
+              devices: 3,
+              countries: 65,
+            })
+            return
+          }
+
+          // Если запрос успешен, используем полученные данные
+          const data = await response.json()
+          setSubscriptionData(data)
+        } catch (error) {
+          console.error("Ошибка при получении данных подписки:", error)
+          // В случае ошибки используем тестовые данные
           setSubscriptionData({
             plan: "FreeBirdVPN",
             status: "offline",
@@ -43,14 +81,25 @@ export default function ProfilePage() {
             devices: 3,
             countries: 65,
           })
-        } catch (error) {
-          console.error("Failed to fetch subscription data:", error)
         }
       }
 
       fetchSubscriptionData()
+    } else if (user && !tokens) {
+      console.log("Пользователь Telegram существует, но не авторизован")
+      setAuthStatus({
+        isAuthenticated: false,
+        provider: ""
+      })
     }
-  }, [user])
+  }, [user, tokens])
+
+  useEffect(() => {
+    // Если данные пользователя отсутствуют и загрузка завершена, перенаправляем на главную страницу
+    if (!isLoading && user === null) {
+      router.push('/')
+    }
+  }, [isLoading, user, router])
 
   if (isLoading) {
     return (
@@ -61,6 +110,11 @@ export default function ProfilePage() {
         <div className="z-10 text-white text-xl">Загрузка...</div>
       </main>
     )
+  }
+
+  // Если пользователь не авторизован, не отображаем содержимое страницы
+  if (!user) {
+    return null
   }
 
   return (
@@ -100,6 +154,11 @@ export default function ProfilePage() {
                 {user?.first_name} {user?.last_name || ""}
               </h2>
               {user?.username && <p className="text-gray-400">@{user.username}</p>}
+              {authStatus.isAuthenticated && (
+                <p className="text-sky-400 text-sm mt-1">
+                  Авторизован через {authStatus.provider === "telegram" ? "Telegram" : authStatus.provider}
+                </p>
+              )}
             </div>
           </div>
 
@@ -180,7 +239,9 @@ export default function ProfilePage() {
             className="w-full py-6 text-lg font-medium bg-transparent border border-sky-800 hover:bg-sky-900/30 text-white rounded-xl"
             speed={4}
             onClick={() => {
-              // Handle logout logic here
+              // Выполняем выход из системы
+              logout()
+              // Перенаправляем на главную страницу
               router.push("/")
             }}
           />
